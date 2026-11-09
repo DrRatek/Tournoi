@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Duels de beauté — Classement d'actrices</title>
+<style>
+  :root{
+    --bg:#0d0d12; --panel:#17171f; --panel2:#1f1f2a; --text:#f2f2f5;
+    --muted:#9a9aad; --accent:#e0559a; --accent2:#7c5cff; --good:#3ecf8e;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{background:var(--bg); color:var(--text); font-family:"Segoe UI", system-ui, Arial, sans-serif; min-height:100vh;}
+  button{cursor:pointer; font-family:inherit;}
+  header{display:flex; align-items:center; gap:8px; padding:10px 16px; background:var(--panel); border-bottom:1px solid #2a2a38; position:sticky; top:0; z-index:20; flex-wrap:wrap;}
+  header h1{font-size:18px; margin-right:auto; background:linear-gradient(90deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent;}
+  .tab{padding:8px 14px; border-radius:8px; border:1px solid transparent; background:transparent; color:var(--muted); font-size:14px;}
+  .tab.active{background:var(--panel2); color:var(--text); border-color:#34344a;}
+  .btn{padding:8px 14px; border-radius:8px; border:1px solid #34344a; background:var(--panel2); color:var(--text); font-size:14px;}
+  .btn:hover{border-color:var(--accent);}
+  .btn.primary{background:linear-gradient(90deg,var(--accent),var(--accent2)); border:none; color:#fff; font-weight:600;}
+  .btn.danger:hover{border-color:#e05555; color:#ff8a8a;}
+  main{padding:16px; max-width:1100px; margin:0 auto;}
+  .hidden{display:none !important;}
+  .toolbar{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px;}
+  .count{color:var(--muted); font-size:14px;}
+  textarea{width:100%; min-height:110px; background:var(--panel2); color:var(--text); border:1px solid #34344a; border-radius:8px; padding:10px; font-family:inherit; font-size:14px;}
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px;}
+  .card{background:var(--panel); border:1px solid #26263a; border-radius:10px; overflow:hidden; display:flex; flex-direction:column;}
+  .card .ph{width:100%; aspect-ratio:3/4; background:var(--panel2); display:flex; align-items:center; justify-content:center; font-size:34px; color:var(--muted); overflow:hidden;}
+  .card .ph img{width:100%; height:100%; object-fit:cover;}
+  .card .nm{padding:8px; font-size:13px; display:flex; gap:6px; align-items:center;}
+  .card input{flex:1; background:transparent; border:none; color:var(--text); font-size:13px; min-width:0;}
+  .card input:focus{outline:none;}
+  .card .del{background:none; border:none; color:var(--muted); font-size:14px; padding:2px 4px;}
+  .card .del:hover{color:#ff8a8a;}
+
+  /* ===== DUELS ===== */
+  #duelScreen{position:fixed; inset:0; z-index:50; display:flex; flex-direction:column; background:#000;}
+  #duelBar{display:flex; align-items:center; gap:12px; padding:8px 14px; background:rgba(13,13,18,.92); font-size:13px; color:var(--muted); flex-wrap:wrap;}
+  #duelBar b{color:var(--text);}
+  #progressWrap{flex:1; height:8px; background:#26263a; border-radius:4px; overflow:hidden; min-width:120px;}
+  #progressFill{height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--accent2)); transition:width .3s;}
+  #duelArena{flex:1; display:flex; min-height:0;}
+  .duelist{position:relative; flex:1; overflow:hidden; cursor:pointer; border:none; background:#111; padding:0;}
+  .duelist img{width:100%; height:100%; object-fit:cover; object-position:top center; display:block; transition:transform .25s, filter .25s;}
+  .duelist:hover img{transform:scale(1.02); filter:brightness(1.08);}
+  .duelist .placeholder{width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:min(18vw,160px); color:#3a3a4d; background:linear-gradient(160deg,#1a1a26,#101018);}
+  .duelist .label{position:absolute; left:0; right:0; bottom:0; padding:18px 20px 22px; font-size:clamp(18px,3vw,30px); font-weight:700; text-align:center; color:#fff; background:linear-gradient(transparent, rgba(0,0,0,.75)); text-shadow:0 2px 8px rgba(0,0,0,.8); pointer-events:none;}
+  .duelist .hint{position:absolute; top:14px; font-size:12px; color:rgba(255,255,255,.65); background:rgba(0,0,0,.45); padding:4px 10px; border-radius:20px; pointer-events:none;}
+  .duelist.left .hint{left:14px;} .duelist.right .hint{right:14px;}
+  #duelVs{display:flex; align-items:center; justify-content:center; padding:0 6px; font-weight:800; color:var(--accent); font-size:clamp(16px,2.4vw,26px); text-shadow:0 0 12px rgba(224,85,154,.6);}
+  #duelActions{display:flex; gap:10px; padding:10px 14px; background:rgba(13,13,18,.92); justify-content:center;}
+  .empty-note{padding:40px; text-align:center; color:var(--muted);}
+  .empty-note .btn{margin-top:14px;}
+
+  /* ===== CLASSEMENT ===== */
+  .rank-row{display:flex; align-items:center; gap:14px; background:var(--panel); border:1px solid #26263a; border-radius:10px; padding:8px 14px 8px 8px; margin-bottom:8px;}
+  .rank-num{width:44px; text-align:right; font-size:20px; font-weight:800; color:var(--muted); flex-shrink:0;}
+  .rank-row:nth-child(-n+3) .rank-num{color:var(--accent);}
+  .rank-ph{width:56px; height:74px; border-radius:6px; overflow:hidden; background:var(--panel2); display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:20px; flex-shrink:0;}
+  .rank-ph img{width:100%; height:100%; object-fit:cover; object-position:top center;}
+  .rank-name{flex:1; font-size:16px; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .rank-meta{color:var(--muted); font-size:13px; text-align:right; flex-shrink:0;}
+  .rank-meta .elo{color:var(--text); font-weight:700;}
+  .podium{display:flex; gap:12px; margin-bottom:20px;}
+  .podium .rank-row{flex:1; margin-bottom:0; flex-direction:column; text-align:center; padding:12px 8px;}
+  .podium .rank-ph{width:100%; height:220px; font-size:40px;}
+  .podium .rank-num{width:auto; text-align:center; font-size:26px;}
+  .settings{background:var(--panel); border:1px solid #26263a; border-radius:10px; padding:14px; margin-bottom:16px; display:flex; gap:14px; align-items:center; flex-wrap:wrap; font-size:14px;}
+  .settings input[type=number]{width:70px; background:var(--panel2); border:1px solid #34344a; color:var(--text); border-radius:6px; padding:6px; font-size:14px;}
+  @media (max-width:640px){ .podium{flex-direction:column;} .podium .rank-ph{height:160px;} }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚔️ Duels de beauté</h1>
+  <button class="tab active" data-tab="gestion">Mes actrices</button>
+  <button class="tab" data-tab="duels">Duels</button>
+  <button class="tab" data-tab="classement">Classement</button>
+</header>
+
+<main>
+  <!-- GESTION -->
+  <section id="tab-gestion">
+    <div class="toolbar">
+      <span class="count" id="countLabel"></span>
+      <button class="btn primary" id="btnImportPhotos">📷 Importer des photos</button>
+      <input type="file" id="fileInput" accept="image/*" multiple class="hidden">
+      <button class="btn" id="btnExample">✨ Charger l'exemple (~250 actrices)</button>
+      <button class="btn" id="btnExportRoster">💾 Exporter la liste</button>
+      <button class="btn" id="btnImportRoster">📂 Importer une liste</button>
+      <input type="file" id="rosterInput" accept=".json,application/json" class="hidden">
+      <button class="btn danger" id="btnClear">🗑 Tout supprimer</button>
+    </div>
+    <div class="settings">
+      <span>Ajouter des noms (un par ligne) :</span>
+      <textarea id="namesInput" placeholder="Ex : Scarlett Johansson&#10;Zendaya&#10;..."></textarea>
+      <button class="btn primary" id="btnAddNames">Ajouter les noms</button>
+    </div>
+    <p style="color:var(--muted); font-size:13px; margin-bottom:12px;">
+      Astuce : nommez vos fichiers photo avec le nom de l'actrice (ex. <i>zendaya.jpg</i>) — la photo sera automatiquement associée au bon nom.
+    </p>
+    <div class="grid" id="gestionGrid"></div>
+  </section>
+
+  <!-- CLASSEMENT -->
+  <section id="tab-classement" class="hidden">
+    <div class="toolbar">
+      <span class="count" id="rankCount"></span>
+      <button class="btn" id="btnExportCSV">📄 Export CSV</button>
+      <button class="btn" id="btnExportJSON">💾 Export JSON</button>
+      <button class="btn primary" id="btnGoDuels">⚔️ Aller aux duels</button>
+    </div>
+    <div class="podium" id="podium"></div>
+    <div id="rankList"></div>
+  </section>
+</main>
+
+<!-- ECRAN DE DUEL PLEIN ECRAN -->
+<div id="duelScreen" class="hidden">
+  <div id="duelBar">
+    <b>Duel <span id="duelNum">0</span></b>
+    <span id="duelInfo"></span>
+    <div id="progressWrap"><div id="progressFill"></div></div>
+    <span id="progressLabel"></span>
+    <button class="btn" id="btnUndo">↩ Annuler</button>
+    <button class="btn" id="btnSkip">⏭ Passer</button>
+    <button class="btn" id="btnCloseDuel">✖ Quitter</button>
+  </div>
+  <div id="duelArena">
+    <button class="duelist left" id="duelLeft">
+      <span class="hint">← touche gauche</span>
+      <div id="duelLeftImg"></div>
+      <div class="label" id="duelLeftName"></div>
+    </button>
+    <div id="duelVs">VS</div>
+    <button class="duelist right" id="duelRight">
+      <span class="hint">touche droite →</span>
+      <div id="duelRightImg"></div>
+      <div class="label" id="duelRightName"></div>
+    </button>
+  </div>
+  <div id="duelActions">
+    <span style="color:var(--muted); font-size:13px;">Cliquez sur la photo de celle que vous trouvez la plus belle (ou utilisez ← →)</span>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ================= DONNEES ================= */
+const LS_KEY = "actrices-duels-v1";
+const DB_NAME = "actrices-photos";
+const PHOTO_STORE = "photos";
+const K_ELO = 24;
+let minDuels = 12;
+
+let actrices = [];       // {id, name, rating, duels, wins, losses}
+let history = [];        // pile d'annulation
+let currentPair = null;
+let duelCount = 0;
+let skippedPair = null;
+
+const EXEMPLE_NOMS = [
+"Marilyn Monroe","Audrey Hepburn","Grace Kelly","Ingrid Bergman","Bette Davis","Katharine Hepburn","Elizabeth Taylor","Sophia Loren","Brigitte Bardot","Catherine Deneuve",
+"Greta Garbo","Marlene Dietrich","Rita Hayworth","Lauren Bacall","Vivien Leigh","Judy Garland","Joan Crawford","Ava Gardner","Lana Turner","Jane Russell",
+"Dorothy Dandridge","Eartha Kitt","Paulette Goddard","Jean Harlow","Claudette Colbert","Barbara Stanwyck","Carole Lombard","Myrna Loy","Jean Arthur","Irene Dunne",
+"Rosalind Russell","Joan Fontaine","Olivia de Havilland","Hedy Lamarr","Veronica Lake","Gene Tierney","Linda Darnell","Susan Hayward","Joan Bennett","Maureen O'Hara",
+"Deborah Kerr","Jean Simmons","Jennifer Jones","Shirley Temple","Joan Collins","Raquel Welch","Ursula Andress","Kim Novak","Jayne Mansfield","Anita Ekberg",
+"Gina Lollobrigida","Silvana Mangano","Giulietta Masina","Anna Magnani","Simone Signoret","Jeanne Moreau","Anna Karina","Romy Schneider","Claudia Cardinale","Monica Vitti",
+"Jane Fonda","Julie Christie","Vanessa Redgrave","Glenda Jackson","Maggie Smith","Diana Rigg","Julie Andrews","Mia Farrow","Ali MacGraw","Faye Dunaway",
+"Diane Keaton","Sissy Spacek","Shelley Duvall","Sigourney Weaver","Meryl Streep","Jessica Lange","Susan Sarandon","Sally Field","Jodie Foster","Cher",
+"Barbra Streisand","Goldie Hawn","Nicole Kidman","Cate Blanchett","Julianne Moore","Tilda Swinton","Frances McDormand","Viola Davis","Natalie Portman","Scarlett Johansson",
+"Emma Stone","Jennifer Lawrence","Zendaya","Florence Pugh","Ana de Armas","Anya Taylor-Joy","Margot Robbie","Saoirse Ronan","Jessie Buckley","Jodie Comer",
+"Emma Thompson","Kate Winslet","Helena Bonham Carter","Kristen Stewart","Emma Watson","Keira Knightley","Natalie Dormer","Emilia Clarke","Millie Bobby Brown","Jenna Ortega",
+"Sydney Sweeney","Lily James","Alicia Vikander","Rebecca Ferguson","Zoe Saldana","Salma Hayek","Penelope Cruz","Monica Bellucci","Eva Green","Lea Seydoux",
+"Marion Cotillard","Juliette Binoche","Isabelle Huppert","Charlotte Gainsbourg","Emmanuelle Beart","Sophie Marceau","Vanessa Paradis","Audrey Tautou","Melanie Laurent","Virginie Efira",
+"Adele Exarchopoulos","Gong Li","Zhang Ziyi","Fan Bingbing","Priyanka Chopra","Deepika Padukone","Aishwarya Rai","Katrina Kaif","Sonam Kapoor","Huma Qureshi",
+"Vidya Balan","Konkona Sen Sharma","Rani Mukerji","Kajol","Madhuri Dixit","Alia Bhatt","Kiara Advani","Rashmika Mandanna","Samantha Ruth Prabhu","Nayanthara",
+"Gal Gadot","Anne Hathaway","Amy Adams","Isla Fisher","Reese Witherspoon","Sandra Bullock","Julia Roberts","Cameron Diaz","Drew Barrymore","Gwyneth Paltrow",
+"Renee Zellweger","Charlize Theron","Dakota Fanning","Elle Fanning","Chloe Grace Moretz","Hailee Steinfeld","Mikey Madison","Margaret Qualley","Maya Hawke","Sadie Sink",
+"Rachel Zegler","Halle Bailey","Storm Reid","Kim Tae-ri","Jun Ji-hyun","Song Hye-kyo","Lee Young-ae","Gong Hyo-jin","Yoona","Suzy",
+"IU","Yui Aragaki","Haruka Ayase","Mao Inoue","Satomi Ishihara","Mirei Kiritani","Tao Tsuchiya","Nana Komatsu","Kanna Hashimoto","Mei Nagano",
+"Kasumi Arimura","Rinko Kikuchi","Rooney Mara","Carey Mulligan","Michelle Williams","Kirsten Dunst","Dakota Johnson","Elizabeth Olsen","Brie Larson","Lupita Nyong'o",
+"Awkwafina","Stephanie Hsu","Hong Chau","Jamie Lee Curtis","Helen Mirren","Judi Dench","Charlotte Rampling","Isabelle Adjani","Nastassja Kinski","Daryl Hannah",
+"Kim Basinger","Michelle Pfeiffer","Geena Davis","Demi Moore","Sharon Stone","Uma Thurman","Winona Ryder","Angelina Jolie","Blake Lively","Emily Blunt",
+"Felicity Jones","Jessica Chastain","Bryce Dallas Howard","Kristen Wiig","Melissa McCarthy","Amy Poehler","Tina Fey","Maya Rudolph","Rashida Jones","Kerry Washington",
+"Taraji P. Henson","Regina King","Angela Bassett","Octavia Spencer","Danai Gurira","Letitia Wright","Zoe Kravitz","Issa Rae","Quinta Brunson","Ayo Edebiri",
+"Hunter Schafer",
+"Natalie Wood","Shirley MacLaine","Rita Moreno","Liza Minnelli","Ann-Margret","Whoopi Goldberg","Glenn Close","Laura Dern","Halle Berry"
+];
+
+/* ================= PERSISTANCE ================= */
+function saveState(){
+  localStorage.setItem(LS_KEY, JSON.stringify({actrices, minDuels}));
+}
+function loadState(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(raw){
+      const s = JSON.parse(raw);
+      actrices = Array.isArray(s.actrices) ? s.actrices : [];
+      minDuels = s.minDuels || 12;
+    }
+  }catch(e){ actrices = []; }
+}
+
+let db = null;
+function openDB(){
+  return new Promise((res, rej)=>{
+    if(db){ res(db); return; }
+    const r = indexedDB.open(DB_NAME, 1);
+    r.onupgradeneeded = ()=>{ r.result.createObjectStore(PHOTO_STORE); };
+    r.onsuccess = ()=>{ db = r.result; res(db); };
+    r.onerror = ()=>rej(r.error);
+  });
+}
+async function savePhoto(id, dataUrl){
+  const d = await openDB();
+  return new Promise((res, rej)=>{
+    const tx = d.transaction(PHOTO_STORE, "readwrite");
+    tx.objectStore(PHOTO_STORE).put(dataUrl, id);
+    tx.oncomplete = res; tx.onerror = ()=>rej(tx.error);
+  });
+}
+async function getPhoto(id){
+  const d = await openDB();
+  return new Promise((res)=>{
+    const tx = d.transaction(PHOTO_STORE, "readonly");
+    const req = tx.objectStore(PHOTO_STORE).get(id);
+    req.onsuccess = ()=>res(req.result || null);
+    req.onerror = ()=>res(null);
+  });
+}
+async function deletePhoto(id){
+  const d = await openDB();
+  return new Promise((res)=>{
+    const tx = d.transaction(PHOTO_STORE, "readwrite");
+    tx.objectStore(PHOTO_STORE).delete(id);
+    tx.oncomplete = res; tx.onerror = res;
+  });
+}
+
+/* ================= OUTILS ================= */
+function uid(){ return "a" + Date.now().toString(36) + Math.random().toString(36).slice(2, 9); }
+function norm(s){ return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\.[a-z0-9]+$/i,"").trim(); }
+function escapeHtml(s){ return s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function expectedScore(ra, rb){ return 1 / (1 + Math.pow(10, (rb - ra) / 400)); }
+
+/* ================= GESTION DES ACTRICES ================= */
+function addNames(names){
+  let added = 0;
+  for(const raw of names){
+    const name = raw.trim();
+    if(!name) continue;
+    if(actrices.some(a => norm(a.name) === norm(name))) continue;
+    actrices.push({id: uid(), name, rating: 1500, duels: 0, wins: 0, losses: 0});
+    added++;
+  }
+  saveState();
+  return added;
+}
+function findByName(name){
+  const n = norm(name);
+  return actrices.find(a => norm(a.name) === n) || null;
+}
+
+/* ================= SELECTION DES DUELS (précision) ================= */
+function pickPair(){
+  const pool = actrices.filter(a => a.duels >= 0);
+  if(pool.length < 2) return null;
+  const under = pool.filter(a => a.duels < minDuels);
+  let a, b;
+  if(under.length >= 2){
+    // phase d'initialisation : on fait combattre celles qui ont le moins de duels,
+    // en privilégiant un écart de score faible quand c'est possible
+    a = under[Math.floor(Math.random() * under.length)];
+    const cands = under.filter(x => x.id !== a.id);
+    b = cands.length ? cands[Math.floor(Math.random() * cands.length)] : pool[Math.floor(Math.random() * pool.length)];
+  } else {
+    // phase de raffinement : on pioche parmi des paires aléatoires celle dont les scores sont les plus proches
+    let best = null, bestDiff = Infinity;
+    for(let i = 0; i < 60; i++){
+      const x = pool[Math.floor(Math.random() * pool.length)];
+      const y = pool[Math.floor(Math.random() * pool.length)];
+      if(!x || !y || x.id === y.id) continue;
+      if(skippedPair && ((skippedPair[0] === x.id && skippedPair[1] === y.id) || (skippedPair[0] === y.id && skippedPair[1] === x.id))) continue;
+      const diff = Math.abs(x.rating - y.rating);
+      if(diff < bestDiff){ bestDiff = diff; best = [x, y]; }
+    }
+    if(!best) return null;
+    a = best[0]; b = best[1];
+  }
+  if(a.id === b.id) return pickPair();
+  return [a, b];
+}
+
+function applyDuel(winner, loser){
+  const exp = expectedScore(winner.rating, loser.rating);
+  history.push({w: winner.id, l: loser.id, wr: winner.rating, lr: loser.rating, wd: winner.duels, ld: loser.duels, ww: winner.wins, lw: loser.losses});
+  winner.rating += K_ELO * (1 - exp);
+  loser.rating  += K_ELO * (0 - (1 - exp));
+  winner.duels++; loser.duels++;
+  winner.wins++; loser.losses++;
+  duelCount++;
+  saveState();
+}
+
+function undoDuel(){
+  const h = history.pop();
+  if(!h) return false;
+  const w = actrices.find(a => a.id === h.w);
+  const l = actrices.find(a => a.id === h.l);
+  if(w){ w.rating = h.wr; w.duels = h.wd; w.wins = h.ww; }
+  if(l){ l.rating = h.lr; l.duels = h.ld; l.losses = h.lw; }
+  duelCount = Math.max(0, duelCount - 1);
+  saveState();
+  return true;
+}
+
+function progress(){
+  if(actrices.length === 0) return 0;
+  const done = actrices.filter(a => a.duels >= minDuels).length;
+  return Math.round(100 * done / actrices.length);
+}
+
+/* ================= AFFICHAGE : GESTION ================= */
+async function renderGestion(){
+  document.getElementById("countLabel").textContent = actrices.length + " actrice(s) dans la liste";
+  const grid = document.getElementById("gestionGrid");
+  grid.innerHTML = "";
+  for(const a of actrices){
+    const card = document.createElement("div");
+    card.className = "card";
+    const ph = document.createElement("div");
+    ph.className = "ph";
+    ph.textContent = a.name.charAt(0).toUpperCase();
+    card.appendChild(ph);
+    getPhoto(a.id).then(p => {
+      if(p){ const img = document.createElement("img"); img.src = p; img.alt = a.name; img.loading = "lazy"; ph.textContent = ""; ph.appendChild(img); }
+    });
+    const nm = document.createElement("div");
+    nm.className = "nm";
+    const input = document.createElement("input");
+    input.value = a.name;
+    input.addEventListener("change", ()=>{ a.name = input.value.trim() || a.name; saveState(); });
+    const del = document.createElement("button");
+    del.className = "del"; del.textContent = "✖"; del.title = "Supprimer";
+    del.addEventListener("click", async ()=>{
+      actrices = actrices.filter(x => x.id !== a.id);
+      await deletePhoto(a.id);
+      saveState(); renderGestion();
+    });
+    nm.appendChild(input); nm.appendChild(del);
+    card.appendChild(nm);
+    grid.appendChild(card);
+  }
+}
+
+/* ================= AFFICHAGE : CLASSEMENT ================= */
+async function renderClassement(){
+  const sorted = [...actrices].sort((a, b) => b.rating - a.rating);
+  document.getElementById("rankCount").textContent = sorted.length + " actrice(s) classées — " + duelCount + " duels effectués";
+  const podium = document.getElementById("podium");
+  const list = document.getElementById("rankList");
+  podium.innerHTML = ""; list.innerHTML = "";
+  const mkRow = (a, rank, big) => {
+    const row = document.createElement("div");
+    row.className = "rank-row";
+    const num = document.createElement("div");
+    num.className = "rank-num"; num.textContent = "#" + rank;
+    const ph = document.createElement("div");
+    ph.className = "rank-ph"; ph.textContent = a.name.charAt(0).toUpperCase();
+    getPhoto(a.id).then(p => { if(p){ const img = document.createElement("img"); img.src = p; img.alt = a.name; img.loading = "lazy"; ph.textContent = ""; ph.appendChild(img); } });
+    const name = document.createElement("div");
+    name.className = "rank-name"; name.textContent = a.name; name.title = a.name;
+    const meta = document.createElement("div");
+    meta.className = "rank-meta";
+    meta.innerHTML = `<span class="elo">${Math.round(a.rating)}</span> pts<br>${a.wins}V / ${a.losses}D`;
+    row.appendChild(num); row.appendChild(ph); row.appendChild(name); row.appendChild(meta);
+    return row;
+  };
+  sorted.slice(0, 3).forEach((a, i) => podium.appendChild(mkRow(a, i + 1)));
+  sorted.slice(3).forEach((a, i) => list.appendChild(mkRow(a, i + 4)));
+  if(sorted.length === 0){
+    list.innerHTML = `<div class="empty-note">Aucune actrice pour le moment.<br><button class="btn primary" onclick="showTab('gestion')">Ajouter des actrices</button></div>`;
+  }
+}
+
+/* ================= ECRAN DE DUEL ================= */
+async function showDuel(){
+  const pair = pickPair();
+  if(!pair){
+    document.getElementById("duelInfo").textContent = actrices.length < 2 ? "Ajoutez au moins 2 actrices d'abord." : "Plus de duel disponible.";
+    return;
+  }
+  currentPair = pair;
+  skippedPair = null;
+  document.getElementById("duelScreen").classList.remove("hidden");
+  document.getElementById("duelNum").textContent = duelCount + 1;
+  document.getElementById("duelInfo").textContent = `Objectif : ${minDuels} duels minimum par actrice`;
+  document.getElementById("progressFill").style.width = progress() + "%";
+  document.getElementById("progressLabel").textContent = progress() + "%";
+  const [a, b] = pair;
+  for(const [side, act] of [["Left", a], ["Right", b]]){
+    document.getElementById("duel" + side + "Name").textContent = act.name;
+    const box = document.getElementById("duel" + side + "Img");
+    box.innerHTML = "";
+    const photo = await getPhoto(act.id);
+    if(photo){
+      const img = document.createElement("img");
+      img.src = photo; img.alt = act.name;
+      box.appendChild(img);
+    } else {
+      const ph = document.createElement("div");
+      ph.className = "placeholder";
+      ph.textContent = act.name.charAt(0).toUpperCase();
+      box.appendChild(ph);
+    }
+  }
+}
+
+function closeDuel(){
+  document.getElementById("duelScreen").classList.add("hidden");
+  renderClassement();
+  renderGestion();
+}
+
+function vote(side){
+  if(!currentPair) return;
+  const winner = side === "left" ? currentPair[0] : currentPair[1];
+  const loser  = side === "left" ? currentPair[1] : currentPair[0];
+  applyDuel(winner, loser);
+  showDuel();
+}
+
+/* ================= ONGLETS ================= */
+function showTab(name){
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
+  document.getElementById("tab-gestion").classList.toggle("hidden", name !== "gestion");
+  document.getElementById("tab-classement").classList.toggle("hidden", name !== "classement");
+  if(name === "gestion") renderGestion();
+  if(name === "classement") renderClassement();
+}
+
+/* ================= EXPORTS / IMPORTS ================= */
+function download(filename, content, type){
+  const blob = new Blob([content], {type: type || "application/octet-stream"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+
+/* ================= EVENTS ================= */
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => showTab(t.dataset.tab)));
+
+document.getElementById("btnImportPhotos").addEventListener("click", () => document.getElementById("fileInput").click());
+document.getElementById("fileInput").addEventListener("change", async (e) => {
+  const files = [...e.target.files];
+  e.target.value = "";
+  if(!files.length) return;
+  let imported = 0, attached = 0;
+  for(const f of files){
+    if(!f.type.startsWith("image/")) continue;
+    const dataUrl = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(f); });
+    const existing = findByName(f.name);
+    if(existing){
+      await savePhoto(existing.id, dataUrl);
+      attached++;
+    } else {
+      const a = {id: uid(), name: f.name.replace(/\.[a-z0-9]+$/i, ""), rating: 1500, duels: 0, wins: 0, losses: 0};
+      actrices.push(a);
+      await savePhoto(a.id, dataUrl);
+      imported++;
+    }
+  }
+  saveState();
+  renderGestion();
+  alert(`${imported} nouvelle(s) actrice(s) ajoutée(s), ${attached} photo(s) attachée(s) à des noms existants.`);
+});
+
+document.getElementById("btnAddNames").addEventListener("click", () => {
+  const names = document.getElementById("namesInput").value.split("\n");
+  const added = addNames(names);
+  document.getElementById("namesInput").value = "";
+  renderGestion();
+  alert(added + " nom(s) ajouté(s).");
+});
+
+document.getElementById("btnExample").addEventListener("click", () => {
+  const added = addNames(EXEMPLE_NOMS);
+  renderGestion();
+  alert(added + " actrices ajoutées (total : " + actrices.length + ").");
+});
+
+document.getElementById("btnClear").addEventListener("click", async () => {
+  if(!confirm("Supprimer toutes les actrices et toutes les photos ?")) return;
+  for(const a of actrices) await deletePhoto(a.id);
+  actrices = []; history = []; duelCount = 0;
+  saveState();
+  renderGestion();
+});
+
+document.getElementById("btnExportRoster").addEventListener("click", () => {
+  const roster = actrices.map(a => ({name: a.name, rating: Math.round(a.rating), duels: a.duels, wins: a.wins, losses: a.losses}));
+  download("liste-actrices.json", JSON.stringify(roster, null, 2), "application/json");
+});
+document.getElementById("btnImportRoster").addEventListener("click", () => document.getElementById("rosterInput").click());
+document.getElementById("rosterInput").addEventListener("change", (e) => {
+  const f = e.target.files[0]; e.target.value = "";
+  if(!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try{
+      const arr = JSON.parse(r.result);
+      if(!Array.isArray(arr)) throw new Error("format invalide");
+      let n = 0;
+      for(const item of arr){
+        const name = String(item.name || item).trim();
+        if(!name) continue;
+        const existing = findByName(name);
+        if(existing){ if(item.rating) existing.rating = item.rating; continue; }
+        actrices.push({id: uid(), name, rating: (item && item.rating) || 1500, duels: 0, wins: 0, losses: 0});
+        n++;
+      }
+      saveState(); renderGestion();
+      alert(n + " nom(s) importé(s).");
+    }catch(err){ alert("Fichier invalide : liste de noms attendue."); }
+  };
+  r.readAsText(f);
+});
+
+document.getElementById("btnExportCSV").addEventListener("click", () => {
+  const sorted = [...actrices].sort((a, b) => b.rating - a.rating);
+  const lines = ["rang,nom,score,victoires,defaites,duels"];
+  sorted.forEach((a, i) => lines.push(`${i+1},"${a.name.replace(/"/g,'""')}",${Math.round(a.rating)},${a.wins},${a.losses},${a.duels}`));
+  download("classement.csv", lines.join("\n"), "text/csv");
+});
+document.getElementById("btnExportJSON").addEventListener("click", () => {
+  const sorted = [...actrices].sort((a, b) => b.rating - a.rating);
+  download("classement.json", JSON.stringify(sorted.map((a, i) => ({rang: i+1, nom: a.name, score: Math.round(a.rating)})), null, 2), "application/json");
+});
+document.getElementById("btnGoDuels").addEventListener("click", () => showDuel());
+
+document.getElementById("duelLeft").addEventListener("click", () => vote("left"));
+document.getElementById("duelRight").addEventListener("click", () => vote("right"));
+document.getElementById("btnUndo").addEventListener("click", () => {
+  if(undoDuel()){ document.getElementById("duelNum").textContent = duelCount + 1; document.getElementById("progressFill").style.width = progress() + "%"; document.getElementById("progressLabel").textContent = progress() + "%"; showDuel(); }
+});
+document.getElementById("btnSkip").addEventListener("click", () => {
+  if(currentPair) skippedPair = [currentPair[0].id, currentPair[1].id];
+  showDuel();
+});
+document.getElementById("btnCloseDuel").addEventListener("click", closeDuel);
+
+document.addEventListener("keydown", (e) => {
+  if(document.getElementById("duelScreen").classList.contains("hidden")) return;
+  if(e.key === "ArrowLeft") vote("left");
+  else if(e.key === "ArrowRight") vote("right");
+  else if(e.key === "Escape") closeDuel();
+});
+
+/* ================= INIT ================= */
+loadState();
+renderGestion();
+</script>
+</body>
+</html>
