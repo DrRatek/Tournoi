@@ -88,6 +88,8 @@
       <span class="count" id="countLabel"></span>
       <button class="btn primary" id="btnImportPhotos">📷 Importer des photos</button>
       <input type="file" id="fileInput" accept="image/*" multiple class="hidden">
+      <button class="btn primary" id="btnImportZip">🗜 Importer un ZIP de photos</button>
+      <input type="file" id="zipInput" accept=".zip,application/zip,application/x-zip-compressed" class="hidden">
       <button class="btn" id="btnExample">✨ Charger l'exemple (~250 actrices)</button>
       <button class="btn" id="btnExportRoster">💾 Exporter la liste</button>
       <button class="btn" id="btnImportRoster">📂 Importer une liste</button>
@@ -100,7 +102,7 @@
       <button class="btn primary" id="btnAddNames">Ajouter les noms</button>
     </div>
     <p style="color:var(--muted); font-size:13px; margin-bottom:12px;">
-      Astuce : nommez vos fichiers photo avec le nom de l'actrice (ex. <i>zendaya.jpg</i>) — la photo sera automatiquement associée au bon nom.
+      Astuce : nommez vos fichiers photo avec le nom de l'actrice (ex. <i>zendaya.jpg</i>) — la photo sera automatiquement associée au bon nom. Vous pouvez aussi importer un <b>fichier ZIP unique</b> contenant toutes les photos.
     </p>
     <div class="grid" id="gestionGrid"></div>
   </section>
@@ -458,6 +460,61 @@ function download(filename, content, type){
 /* ================= EVENTS ================= */
 document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => showTab(t.dataset.tab)));
 
+async function importImage(fileName, blob){
+  const dataUrl = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
+  const baseName = fileName.split("/").pop();
+  const existing = findByName(baseName);
+  if(existing){
+    await savePhoto(existing.id, dataUrl);
+    return "attached";
+  }
+  const a = {id: uid(), name: baseName.replace(/\.[a-z0-9]+$/i, ""), rating: 1500, duels: 0, wins: 0, losses: 0};
+  actrices.push(a);
+  await savePhoto(a.id, dataUrl);
+  return "new";
+}
+
+async function unzipEntries(arrayBuffer){
+  if(typeof DecompressionStream === "undefined") throw new Error("navigateur non compatible (DecompressionStream indisponible)");
+  const bytes = new Uint8Array(arrayBuffer);
+  const view = new DataView(arrayBuffer);
+  let eocd = -1;
+  for(let i = bytes.length - 22; i >= Math.max(0, bytes.length - 22 - 65536); i--){
+    if(view.getUint32(i, true) === 0x06054b50){ eocd = i; break; }
+  }
+  if(eocd < 0) throw new Error("fichier ZIP invalide");
+  const count = view.getUint16(eocd + 10, true);
+  let offset = view.getUint32(eocd + 16, true);
+  const decoder = new TextDecoder();
+  const entries = [];
+  for(let i = 0; i < count; i++){
+    if(view.getUint32(offset, true) !== 0x02014b50) break;
+    const method = view.getUint16(offset + 10, true);
+    const compSize = view.getUint32(offset + 20, true);
+    const nameLen = view.getUint16(offset + 28, true);
+    const extraLen = view.getUint16(offset + 30, true);
+    const commentLen = view.getUint16(offset + 32, true);
+    const localOffset = view.getUint32(offset + 42, true);
+    const name = decoder.decode(bytes.subarray(offset + 46, offset + 46 + nameLen));
+    offset += 46 + nameLen + extraLen + commentLen;
+    if(name.endsWith("/")) continue;
+    if(view.getUint32(localOffset, true) !== 0x04034b50) continue;
+    const lNameLen = view.getUint16(localOffset + 26, true);
+    const lExtraLen = view.getUint16(localOffset + 28, true);
+    const dataStart = localOffset + 30 + lNameLen + lExtraLen;
+    const compData = bytes.subarray(dataStart, dataStart + compSize);
+    let data;
+    if(method === 0) data = compData;
+    else if(method === 8){
+      const ds = new DecompressionStream("deflate-raw");
+      const stream = new Blob([compData]).stream().pipeThrough(ds);
+      data = new Uint8Array(await new Response(stream).arrayBuffer());
+    } else continue;
+    entries.push({name, data});
+  }
+  return entries;
+}
+
 document.getElementById("btnImportPhotos").addEventListener("click", () => document.getElementById("fileInput").click());
 document.getElementById("fileInput").addEventListener("change", async (e) => {
   const files = [...e.target.files];
@@ -466,21 +523,34 @@ document.getElementById("fileInput").addEventListener("change", async (e) => {
   let imported = 0, attached = 0;
   for(const f of files){
     if(!f.type.startsWith("image/")) continue;
-    const dataUrl = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(f); });
-    const existing = findByName(f.name);
-    if(existing){
-      await savePhoto(existing.id, dataUrl);
-      attached++;
-    } else {
-      const a = {id: uid(), name: f.name.replace(/\.[a-z0-9]+$/i, ""), rating: 1500, duels: 0, wins: 0, losses: 0};
-      actrices.push(a);
-      await savePhoto(a.id, dataUrl);
-      imported++;
-    }
+    const r = await importImage(f.name, f);
+    if(r === "new") imported++; else attached++;
   }
   saveState();
   renderGestion();
   alert(`${imported} nouvelle(s) actrice(s) ajoutée(s), ${attached} photo(s) attachée(s) à des noms existants.`);
+});
+
+document.getElementById("btnImportZip").addEventListener("click", () => document.getElementById("zipInput").click());
+document.getElementById("zipInput").addEventListener("change", async (e) => {
+  const f = e.target.files[0];
+  e.target.value = "";
+  if(!f) return;
+  try{
+    const entries = await unzipEntries(await f.arrayBuffer());
+    const imgs = entries.filter(en => /\.(jpe?g|png|webp|gif|avif|bmp)$/i.test(en.name));
+    if(!imgs.length){ alert("Aucune image trouvée dans ce ZIP."); return; }
+    let imported = 0, attached = 0;
+    for(const en of imgs){
+      const r = await importImage(en.name, new Blob([en.data]));
+      if(r === "new") imported++; else attached++;
+    }
+    saveState();
+    renderGestion();
+    alert(`${imgs.length} image(s) trouvée(s) dans ${f.name} : ${imported} nouvelle(s) actrice(s), ${attached} photo(s) attachée(s) à des noms existants.`);
+  }catch(err){
+    alert("Impossible de lire ce ZIP : " + err.message);
+  }
 });
 
 document.getElementById("btnAddNames").addEventListener("click", () => {
