@@ -86,7 +86,7 @@
   <section id="tab-gestion">
     <div class="toolbar">
       <span class="count" id="countLabel"></span>
-      <button class="btn primary" id="btnImportPhotos">📷 Importer des photos</button>
+      <button class="btn primary" id="btnImportPhotos">📷 Importer des fichiers image</button>
       <input type="file" id="fileInput" accept="image/*" multiple class="hidden">
       <button class="btn primary" id="btnImportZip">🗜 Importer un ZIP de photos</button>
       <input type="file" id="zipInput" accept=".zip,application/zip,application/x-zip-compressed" class="hidden">
@@ -102,7 +102,7 @@
       <button class="btn primary" id="btnAddNames">Ajouter les noms</button>
     </div>
     <p style="color:var(--muted); font-size:13px; margin-bottom:12px;">
-      Astuce : nommez vos fichiers photo avec le nom de l'actrice (ex. <i>zendaya.jpg</i>) — la photo sera automatiquement associée au bon nom. Vous pouvez aussi importer un <b>fichier ZIP unique</b> contenant toutes les photos.
+      Astuce : nommez vos fichiers photo avec le nom de l'actrice (ex. <i>zendaya.jpg</i>) — la photo sera automatiquement associée au bon nom. Vous pouvez sélectionner plusieurs fichiers image d'un coup, les <b>glisser-déposer</b> sur cette page, ou importer un <b>fichier ZIP unique</b> contenant toutes les photos.
     </p>
     <div class="grid" id="gestionGrid"></div>
   </section>
@@ -515,10 +515,7 @@ async function unzipEntries(arrayBuffer){
   return entries;
 }
 
-document.getElementById("btnImportPhotos").addEventListener("click", () => document.getElementById("fileInput").click());
-document.getElementById("fileInput").addEventListener("change", async (e) => {
-  const files = [...e.target.files];
-  e.target.value = "";
+async function handleImageFiles(files){
   if(!files.length) return;
   let imported = 0, attached = 0;
   for(const f of files){
@@ -529,7 +526,21 @@ document.getElementById("fileInput").addEventListener("change", async (e) => {
   saveState();
   renderGestion();
   alert(`${imported} nouvelle(s) actrice(s) ajoutée(s), ${attached} photo(s) attachée(s) à des noms existants.`);
+}
+
+document.getElementById("btnImportPhotos").addEventListener("click", () => document.getElementById("fileInput").click());
+document.getElementById("fileInput").addEventListener("change", (e) => {
+  const files = [...e.target.files];
+  e.target.value = "";
+  handleImageFiles(files);
 });
+
+["dragover", "drop"].forEach(evt => document.addEventListener(evt, (e) => {
+  if(e.dataTransfer && [...e.dataTransfer.types].includes("Files")){
+    e.preventDefault();
+    if(evt === "drop") handleImageFiles([...e.dataTransfer.files]);
+  }
+}));
 
 document.getElementById("btnImportZip").addEventListener("click", () => document.getElementById("zipInput").click());
 document.getElementById("zipInput").addEventListener("change", async (e) => {
