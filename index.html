@@ -42,8 +42,8 @@
   #progressWrap{flex:1; height:8px; background:#26263a; border-radius:4px; overflow:hidden; min-width:120px;}
   #progressFill{height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--accent2)); transition:width .3s;}
   #duelArena{flex:1; display:flex; min-height:0;}
-  .duelist{position:relative; flex:1; overflow:hidden; cursor:pointer; border:none; background:#111; padding:0;}
-  .duelist img{width:100%; height:100%; object-fit:cover; object-position:top center; display:block; transition:transform .25s, filter .25s;}
+  .duelist{position:relative; flex:1; overflow:hidden; cursor:pointer; border:none; background:#000; padding:0;}
+  .duelist img{width:100%; height:100%; object-fit:contain; display:block; transition:transform .25s, filter .25s;}
   .duelist:hover img{transform:scale(1.02); filter:brightness(1.08);}
   .duelist .placeholder{width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:min(18vw,160px); color:#3a3a4d; background:linear-gradient(160deg,#1a1a26,#101018);}
   .duelist .label{position:absolute; left:0; right:0; bottom:0; padding:18px 20px 22px; font-size:clamp(18px,3vw,30px); font-weight:700; text-align:center; color:#fff; background:linear-gradient(transparent, rgba(0,0,0,.75)); text-shadow:0 2px 8px rgba(0,0,0,.8); pointer-events:none;}
